@@ -5,6 +5,7 @@ import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/models/pull_request.dart';
 import 'package:pr_watch/models/settings.dart';
 import 'package:pr_watch/services/github_service.dart';
+import 'package:pr_watch/services/snackbar_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class Watch extends StatefulWidget {
@@ -39,108 +40,122 @@ class _WatchState extends State<Watch> {
   }
 
   Future<void> _loadReview(String org, String repo) async {
-    _loadingCount++;
-    var prs = (await GithubService.instance.fetchPullRequests(org, repo))
-        .where((pr) => widget.appState.isMemberWatched[pr.user!.id] == true)
-        .toList();
-    for (var pr in prs) {
-      _loadReviewedState(pr);
-    }
-    _loadingCount--;
-    _finalizeList();
-  }
-
-  Future<void> _loadReviewedState(PullRequest pr) async {
-    // If the PR is a draft and not created by the current user, skip it
-    if (pr.draft && pr.user?.id != widget.appState.currentUser?.id) {
-      _finalizeList();
-      return;
-    }
-    _loadingCount++;
-
-    var requestedReviewers =
-        pr.requestedReviewers?.map((e) => e.id).toList() ?? [];
-
-    // fetch reviews and filter out requested reviewers or comments
-    var reviews = (await GithubService.instance.fetchReviewState(pr))
-        .where((element) =>
-            element.user != null &&
-            (element.state == 'APPROVED' ||
-                element.state == 'CHANGES_REQUESTED') &&
-            !requestedReviewers.contains(element.user!.id))
-        .toList();
-
-    final level1 = reviews
-        .where((pr) => widget.appState.memberLevel[pr.user!.id] == 1)
-        .toList();
-    final level2 = reviews
-        .where((pr) => widget.appState.memberLevel[pr.user!.id] == 2)
-        .toList();
-
-    for (var i = 0; i < level1.length; i++) {
-      if (level1.any((element) =>
-          element.id != level1[i].id &&
-          element.submittedAt.isAfter(level1[i].submittedAt) &&
-          element.user?.id == level1[i].user?.id)) {
-        level1.removeAt(i);
-        i--;
-      }
-    }
-
-    for (var i = 0; i < level2.length; i++) {
-      if (level2.any((element) =>
-          element.id != level2[i].id &&
-          element.submittedAt.isAfter(level2[i].submittedAt) &&
-          element.user?.id == level2[i].user?.id)) {
-        level2.removeAt(i);
-        i--;
-      }
-    }
-
-    if (level1.any((element) => element.state == 'CHANGES_REQUESTED')) {
-      _level1[pr.id] = 'CHANGES_REQUESTED';
-    } else if (level1.any((element) => element.state == 'APPROVED')) {
-      _level1[pr.id] = 'APPROVED';
-    } else {
-      _level1[pr.id] = 'PENDING';
-    }
-
-    if (level2.any((element) => element.state == 'CHANGES_REQUESTED')) {
-      _level2[pr.id] = 'CHANGES_REQUESTED';
-    } else if (level2.any((element) => element.state == 'APPROVED')) {
-      _level2[pr.id] = 'APPROVED';
-    } else {
-      _level2[pr.id] = 'PENDING';
-    }
-
-    if (pr.user!.id == widget.appState.currentUser!.id) {
-      if (widget.appState.settings.showYourDrafts) {
-        _myPullRequests.add(pr);
-      } else if (!pr.draft) {
-        _myPullRequests.add(pr);
+    try {
+      _loadingCount++;
+      var prs = (await GithubService.instance.fetchPullRequests(org, repo))
+          .where((pr) => widget.appState.isMemberWatched[pr.user!.id] == true)
+          .toList();
+      for (var pr in prs) {
+        _loadReviewedState(pr);
       }
       _loadingCount--;
       _finalizeList();
-      return;
     }
-
-    var level =
-        widget.appState.memberLevel[widget.appState.currentUser!.id] ?? 1;
-
-    if (widget.appState.settings.showReviewed) {
-      _pullRequests.add(pr);
-    } else if (pr.requestedReviewers
-            ?.any((e) => e.id == widget.appState.currentUser!.id) ==
-        true) {
-      _pullRequests.add(pr);
-    } else if (level == 1 && level1.isEmpty) {
-      _pullRequests.add(pr);
-    } else if (level == 2 && level2.isEmpty) {
-      _pullRequests.add(pr);
+    on Exception catch (e) {
+      if(!mounted) return;
+      SnackbarService.show(context, e.toString());
     }
+  }
 
-    _loadingCount--;
-    _finalizeList();
+  Future<void> _loadReviewedState(PullRequest pr) async {
+    try {
+      // If the PR is a draft and not created by the current user, skip it
+      if (pr.draft && pr.user?.id != widget.appState.currentUser?.id) {
+        _finalizeList();
+        return;
+      }
+      _loadingCount++;
+
+      var requestedReviewers =
+          pr.requestedReviewers?.map((e) => e.id).toList() ?? [];
+
+      // fetch reviews and filter out requested reviewers or comments
+      var reviews = (await GithubService.instance.fetchReviewState(pr))
+          .where((element) =>
+              element.user != null &&
+              (element.state == 'APPROVED' ||
+                  element.state == 'CHANGES_REQUESTED') &&
+              !requestedReviewers.contains(element.user!.id))
+          .toList();
+
+      final level1 = reviews
+          .where((pr) => widget.appState.memberLevel[pr.user!.id] == 1)
+          .toList();
+      final level2 = reviews
+          .where((pr) => widget.appState.memberLevel[pr.user!.id] == 2)
+          .toList();
+
+      for (var i = 0; i < level1.length; i++) {
+        if (level1.any((element) =>
+            element.id != level1[i].id &&
+            element.submittedAt.isAfter(level1[i].submittedAt) &&
+            element.user?.id == level1[i].user?.id)) {
+          level1.removeAt(i);
+          i--;
+        }
+      }
+
+      for (var i = 0; i < level2.length; i++) {
+        if (level2.any((element) =>
+            element.id != level2[i].id &&
+            element.submittedAt.isAfter(level2[i].submittedAt) &&
+            element.user?.id == level2[i].user?.id)) {
+          level2.removeAt(i);
+          i--;
+        }
+      }
+
+      if (level1.any((element) => element.state == 'CHANGES_REQUESTED')) {
+        _level1[pr.id] = 'CHANGES_REQUESTED';
+      } else if (level1.any((element) => element.state == 'APPROVED')) {
+        _level1[pr.id] = 'APPROVED';
+      } else {
+        _level1[pr.id] = 'PENDING';
+      }
+
+      if (level2.any((element) => element.state == 'CHANGES_REQUESTED')) {
+        _level2[pr.id] = 'CHANGES_REQUESTED';
+      } else if (level2.any((element) => element.state == 'APPROVED')) {
+        _level2[pr.id] = 'APPROVED';
+      } else {
+        _level2[pr.id] = 'PENDING';
+      }
+
+      if (pr.user!.id == widget.appState.currentUser!.id) {
+        if (widget.appState.settings.showYourDrafts) {
+          _myPullRequests.add(pr);
+        } else if (!pr.draft) {
+          _myPullRequests.add(pr);
+        }
+        _loadingCount--;
+        _finalizeList();
+        return;
+      }
+
+      var level =
+          widget.appState.memberLevel[widget.appState.currentUser!.id] ?? 1;
+
+      if (widget.appState.settings.showReviewed) {
+        _pullRequests.add(pr);
+      } else if (pr.requestedReviewers
+              ?.any((e) => e.id == widget.appState.currentUser!.id) ==
+          true) {
+        _pullRequests.add(pr);
+      } else if (level == 1 && level1.isEmpty) {
+        _pullRequests.add(pr);
+      } else if (level == 2 && level2.isEmpty) {
+        _pullRequests.add(pr);
+      }
+
+      _loadingCount--;
+      _finalizeList();
+    }
+    on Exception catch (e) {
+        if(!mounted) return;
+        SnackbarService.show(context, e.toString());
+        _loadingCount--;
+        _finalizeList();
+    }
   }
 
   void _finalizeList() {

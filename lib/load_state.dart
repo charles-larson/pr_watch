@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/services/github_service.dart';
+import 'package:pr_watch/services/snackbar_service.dart';
 
 class LoadState extends StatefulWidget {
   const LoadState({super.key, required this.onLoaded});
@@ -23,8 +24,9 @@ class _LoadStateState extends State<LoadState> {
         widget.onLoaded(AppState(currentUser: user));
         return;
       } catch (e) {
-        print(e);
         await storage.delete(key: 'GITHUB_TOKEN');
+        if(!mounted) return;
+        SnackbarService.show(context, e.toString());
       }
     }
     widget.onLoaded(AppState());

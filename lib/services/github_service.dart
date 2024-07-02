@@ -31,7 +31,7 @@ class GithubService {
     if (response.statusCode == 200) {
       return User.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception('Failed to load user');
+      throw Exception('Failed to load user. Status code: ${response.statusCode}');
     }
   }
 
@@ -54,7 +54,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw Exception('Failed to load organizations');
+        throw Exception('Failed to load organizations. Status code: ${response.statusCode}');
       }
     }
     return orgs;
@@ -78,7 +78,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw Exception('Failed to load teams');
+        throw Exception('Failed to load teams. Did you enable SSO? 👀 Status code: ${response.statusCode}');
       }
     }
     teams.sort((a, b) => a.name.compareTo(b.name));
@@ -104,7 +104,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw Exception('Failed to load pull requests');
+        throw Exception('Failed to load pull requests. Status code: ${response.statusCode}');
       }
     }
     return pulls;
@@ -131,7 +131,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw Exception('Failed to load repositories');
+        throw Exception('Failed to load repositories. Status code: ${response.statusCode}');
       }
     }
     return repos;
@@ -157,7 +157,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw Exception('Failed to load members');
+        throw Exception('Failed to load members. Status code: ${response.statusCode}');
       }
     }
     return repos;
@@ -176,7 +176,7 @@ class GithubService {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((e) => Review.fromJson(e)).toList();
     } else {
-      throw Exception('Failed to load review state');
+      throw Exception('Failed to load review state. Status code: ${response.statusCode}');
     }
   }
 }

@@ -24,12 +24,12 @@ class _ProfileState extends State<Profile> {
           const SizedBox(height: 20),
           Text(
             widget.user.name ?? widget.user.login,
-            style: Theme.of(context).textTheme.headline5,
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 20),
           Text(
             widget.user.bio ?? 'No bio available',
-            style: Theme.of(context).textTheme.bodyText1,
+            style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 20),
           ElevatedButton(

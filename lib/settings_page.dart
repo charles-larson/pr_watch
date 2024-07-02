@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pr_watch/models/app_state.dart';
-import 'package:pr_watch/models/member.dart';
 import 'package:pr_watch/models/settings.dart';
 
 class SettingsPage extends StatefulWidget {

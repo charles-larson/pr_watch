@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pr_watch/models/app_state.dart';
-import 'package:pr_watch/models/pull_request.dart';
 import 'package:pr_watch/models/repository.dart';
-import 'package:pr_watch/services/github_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class Repos extends StatefulWidget {
