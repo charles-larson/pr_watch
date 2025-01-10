@@ -43,6 +43,14 @@ class _MembersState extends State<SettingsPage> {
         key: 'SETTINGS', value: widget.appState.settings.toString());
   }
 
+  void _useTwoStepLevel2Reviews(bool value) async {
+    setState(() {
+      widget.appState.settings.useTwoStepLevel2Reviews = value;
+    });
+    await _storage.write(
+        key: 'SETTINGS', value: widget.appState.settings.toString());
+  }
+
   String _sortModeToString(SortMode mode) {
     switch (mode) {
       case SortMode.alphabetical:
@@ -109,6 +117,19 @@ class _MembersState extends State<SettingsPage> {
               Switch(
                   value: widget.appState.settings.showReviewed,
                   onChanged: _showReviewedChanged),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Use two-step Level 2 reviews:',
+                  style: TextStyle(color: Colors.white, fontSize: 18)),
+              Switch(
+                  value: widget.appState.settings.useTwoStepLevel2Reviews,
+                  onChanged: _useTwoStepLevel2Reviews),
             ],
           ),
         ),

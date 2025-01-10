@@ -80,9 +80,8 @@ class _ConfigureStateState extends State<ConfigureState> {
           }
         }
       }
-    }
-    on Exception catch (e) {
-      if(!mounted) return;
+    } on Exception catch (e) {
+      if (!mounted) return;
       SnackbarService.show(context, e.toString());
     }
   }
@@ -120,6 +119,22 @@ class _ConfigureStateState extends State<ConfigureState> {
             value: _appState.members.map((e) => e.id).join(','));
       }
 
+      var adminReviewers = await storage.read(key: 'ADMIN_REVIEWER');
+      if (adminReviewers != null) {
+        var admin = adminReviewers.split(',').map((e) => int.tryParse(e));
+        for (var i = 0; i < _appState.members.length; i++) {
+          _appState.isAdminReviewer[_appState.members[i].id] =
+              admin.contains(_appState.members[i].id);
+        }
+      } else {
+        for (var i = 0; i < _appState.members.length; i++) {
+          _appState.isAdminReviewer[_appState.members[i].id] = false;
+        }
+        await storage.write(
+            key: 'ADMIN_REVIEWER',
+            value: _appState.members.map((e) => e.id).join(','));
+      }
+
       var memberLevels = await storage.read(key: 'MEMBER_LEVELS');
       if (memberLevels != null) {
         var levels = memberLevels.split(',').map((e) => e.split(':'));
@@ -146,9 +161,8 @@ class _ConfigureStateState extends State<ConfigureState> {
         _appState.settings = Settings.fromJson(parsedSettings);
       }
       widget.onLoaded(_appState);
-    }
-    on Exception catch(e) {
-      if(!mounted) return;
+    } on Exception catch (e) {
+      if (!mounted) return;
       SnackbarService.show(context, e.toString());
     }
   }
@@ -168,9 +182,8 @@ class _ConfigureStateState extends State<ConfigureState> {
         _loading = false;
         _loadingText = '';
       });
-    }
-    on Exception catch(e) {
-      if(!mounted) return;
+    } on Exception catch (e) {
+      if (!mounted) return;
       SnackbarService.show(context, e.toString());
     }
   }
@@ -182,9 +195,8 @@ class _ConfigureStateState extends State<ConfigureState> {
         _appState.currentTeam = team;
       });
       _loadMembersAndRepos();
-    }
-    on Exception catch(e) {
-      if(!mounted) return;
+    } on Exception catch (e) {
+      if (!mounted) return;
       SnackbarService.show(context, e.toString());
     }
   }
@@ -274,13 +286,12 @@ class _ConfigureStateState extends State<ConfigureState> {
           onChanged: (value) {
             setState(() {
               _emptySearchText = value.isEmpty;
-              if(!_emptySearchText){ 
+              if (!_emptySearchText) {
                 _filteredTeams = _teams
-                    .where(
-                        (t) => t.name.toLowerCase().contains(value.toLowerCase()))
+                    .where((t) =>
+                        t.name.toLowerCase().contains(value.toLowerCase()))
                     .toList();
-              }
-              else {
+              } else {
                 _filteredTeams = [];
               }
             });
@@ -329,7 +340,7 @@ class _ConfigureStateState extends State<ConfigureState> {
                 style: TextStyle(fontSize: 24, color: Colors.white)),
           ),
         if (_filteredTeams.isEmpty && _emptySearchText)
-        const Center(
+          const Center(
             child: Text('Search for your team',
                 style: TextStyle(fontSize: 24, color: Colors.white)),
           ),
