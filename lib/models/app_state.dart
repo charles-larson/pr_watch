@@ -13,6 +13,7 @@ class AppState {
   List<Member> members = []; // create wrapper model for this list and maps
   Map<int, bool> isMemberWatched = {};
   Map<int, int> memberLevel = {};
+  Map<int, bool> isAdminReviewer = {};
   Settings settings = Settings.defaultSettings;
 
   AppState({
