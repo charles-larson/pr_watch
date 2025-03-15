@@ -1,16 +1,46 @@
-# pr_watch
+# PR Watch
 
-A new Flutter project.
+PR Watch is a multi-platform application designed to monitor pull requests for repositories with a 2-tier review process on your team. It supports Android, iOS, Linux, macOS, Web, and Windows but has only been tested on Windows. The application polls for updates every 10 minutes with the goal of avoiding text channels and ad-hoc messaging to get pull requests reviewed.
+
+![Preview of PR Watch in action](preview.png)
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+1. **Clone the repository**  
+    Run:
+    ```
+    git clone https://github.com/charles-larson/pr_watch.git
+    ```
 
-A few resources to get you started if this is your first Flutter project:
+2. **Install Dependencies**  
+    Ensure Flutter is installed. Then run:
+    ```
+    flutter pub get
+    ```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+3. **Run the Application**  
+    For Windows (or any supported platform), use:
+    ```
+    flutter run
+    ```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Project Structure
+- **lib/**: Dart source code.
+- **ios/**, **android/**, **linux/**, **macos/**, **web/**, **windows/**: Platform-specific code and configuration.
+- **pubspec.yaml**: Project metadata and dependencies.
+- **README.md**: This documentation.
+- **LICENSE**: MIT License.
+
+## Building for Different Platforms
+
+Refer to the Flutter documentation for building/releases on various platforms:
+- [Build and release an Android app](https://flutter.dev/docs/deployment/android)
+- [Build and release an iOS app](https://flutter.dev/docs/deployment/ios)
+- [Build and release a macOS app](https://flutter.dev/docs/deployment/macos)
+- [Build and release a Linux app](https://flutter.dev/docs/deployment/linux)
+- [Build and release a Web app](https://flutter.dev/docs/deployment/web)
+- [Build and release a Windows app](https://flutter.dev/docs/deployment/windows)
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
