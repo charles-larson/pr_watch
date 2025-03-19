@@ -49,8 +49,19 @@ class _SplitCirclePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    drawFullCircle(canvas, size, colorRight);
     drawLeftHalfCircle(canvas, size, colorLeft);
-    drawRightHalfCircle(canvas, size, colorRight);
+  }
+
+  void drawFullCircle(Canvas canvas, Size size, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path();
+
+    path.addOval(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    canvas.drawPath(path, paint);
   }
 
   void drawLeftHalfCircle(Canvas canvas, Size size, Color color) {
@@ -71,26 +82,9 @@ class _SplitCirclePainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
-  void drawRightHalfCircle(Canvas canvas, Size size, Color color) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final path = Path();
-
-    path.moveTo(size.width / 2, 0);
-    path.arcToPoint(
-      Offset(size.width / 2, size.height),
-      radius: Radius.circular(size.width / 2),
-      clockwise: true,
-    );
-    path.lineTo(size.width / 2, size.height);
-    path.lineTo(size.width / 2, 0);
-
-    canvas.drawPath(path, paint);
-  }
-
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
+  bool shouldRepaint(covariant _SplitCirclePainter oldDelegate) {
+    return colorLeft != oldDelegate.colorLeft ||
+        colorRight != oldDelegate.colorRight;
   }
 }
