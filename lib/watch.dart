@@ -40,8 +40,9 @@ class _WatchState extends State<Watch> {
     }
   }
 
-  void _updateLevel2ReviewInfo(int prId, String level2aStatus,
-      String level2bStatus, bool isAdminReview) {
+  void _updateLevel2ReviewInfo(
+      int prId, String level2aStatus, String level2bStatus,
+      [bool isAdminReview = false]) {
     setState(() {
       _level2Reviews[prId] = ReviewInfo(
         level2aStatus: level2aStatus,
@@ -149,6 +150,17 @@ class _WatchState extends State<Watch> {
           i--;
         }
       }
+
+      for (var i = 0; i < adminReviews.length; i++) {
+        if (adminReviews.any((element) =>
+            element.id != adminReviews[i].id &&
+            element.submittedAt.isAfter(adminReviews[i].submittedAt) &&
+            element.user?.id == adminReviews[i].user?.id)) {
+          adminReviews.removeAt(i);
+          i--;
+        }
+      }
+
       setState(() {
         if (level1.any((element) => element.state == 'CHANGES_REQUESTED')) {
           _level1[pr.id] = 'CHANGES_REQUESTED';
@@ -159,7 +171,10 @@ class _WatchState extends State<Watch> {
         }
 
         if (widget.appState.settings.useTwoStepLevel2Reviews) {
-          if (adminReviews.isNotEmpty) {
+          if (adminReviews.isNotEmpty &&
+              !level2.any((element) =>
+                  element.state == 'CHANGES_REQUESTED' &&
+                  widget.appState.isAdminReviewer[element.user!.id] != true)) {
             if (adminReviews
                 .any((element) => element.state == 'CHANGES_REQUESTED')) {
               _updateLevel2ReviewInfo(
@@ -171,42 +186,41 @@ class _WatchState extends State<Watch> {
               _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING', true);
             }
           } else {
-            if (level2.isNotEmpty) {
-              if (level2[0].state == 'CHANGES_REQUESTED') {
-                _updateLevel2aReviewInfo(pr.id, 'CHANGES_REQUESTED');
-              } else if (level2[0].state == 'APPROVED') {
-                _updateLevel2aReviewInfo(pr.id, 'APPROVED');
-              } else {
-                _updateLevel2aReviewInfo(pr.id, 'PENDING');
-              }
-            } else {
-              _updateLevel2aReviewInfo(pr.id, 'PENDING');
-            }
+            int changesRequestedCount = level2
+                .where((element) => element.state == 'CHANGES_REQUESTED')
+                .length;
+            int approvedCount =
+                level2.where((element) => element.state == 'APPROVED').length;
 
-            if (level2.length > 1) {
-              if (level2[1].state == 'CHANGES_REQUESTED') {
-                _updateLevel2bReviewInfo(pr.id, 'CHANGES_REQUESTED');
-              } else if (level2[1].state == 'APPROVED') {
-                _updateLevel2bReviewInfo(pr.id, 'APPROVED');
+            if (changesRequestedCount >= 2) {
+              _updateLevel2ReviewInfo(
+                  pr.id, 'CHANGES_REQUESTED', 'CHANGES_REQUESTED');
+            } else if (changesRequestedCount == 1) {
+              if (approvedCount >= 1) {
+                _updateLevel2ReviewInfo(pr.id, 'CHANGES_REQUESTED', 'APPROVED');
               } else {
-                _updateLevel2bReviewInfo(pr.id, 'PENDING');
+                _updateLevel2ReviewInfo(pr.id, 'CHANGES_REQUESTED', 'PENDING');
               }
+            } else if (approvedCount >= 2) {
+              _updateLevel2ReviewInfo(pr.id, 'APPROVED', 'APPROVED');
+            } else if (approvedCount == 1) {
+              _updateLevel2ReviewInfo(pr.id, 'APPROVED', 'PENDING');
             } else {
-              _updateLevel2bReviewInfo(pr.id, 'PENDING');
+              _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING');
             }
           }
         } else {
           if (level2.isNotEmpty) {
-            if (level2[0].state == 'CHANGES_REQUESTED') {
+            if (level2.any((element) => element.state == 'CHANGES_REQUESTED')) {
               _updateLevel2ReviewInfo(
-                  pr.id, 'CHANGES_REQUESTED', 'CHANGES_REQUESTED', false);
-            } else if (level2[0].state == 'APPROVED') {
-              _updateLevel2ReviewInfo(pr.id, 'APPROVED', 'APPROVED', false);
+                  pr.id, 'CHANGES_REQUESTED', 'CHANGES_REQUESTED');
+            } else if (level2.any((element) => element.state == 'APPROVED')) {
+              _updateLevel2ReviewInfo(pr.id, 'APPROVED', 'APPROVED');
             } else {
-              _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING', false);
+              _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING');
             }
           } else {
-            _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING', false);
+            _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING');
           }
         }
       });
