@@ -1,12 +1,13 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:pr_watch/split_circle.dart';
 import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/models/pull_request.dart';
 import 'package:pr_watch/models/settings.dart';
 import 'package:pr_watch/services/github_service.dart';
 import 'package:pr_watch/services/snackbar_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:pr_watch/models/review_info.dart';
 
 class Watch extends StatefulWidget {
   const Watch({super.key, required this.appState});
@@ -22,7 +23,7 @@ class _WatchState extends State<Watch> {
   final List<PullRequest> _filteredMyPullRequests = [];
   final List<PullRequest> _filteredPullRequests = [];
   final Map<int, String> _level1 = {};
-  final Map<int, String> _level2 = {};
+  final Map<int, ReviewInfo> _level2Reviews = {};
   int _loadingCount = 0;
   int _refreshCountdown = 0;
   bool get _loading => _loadingCount > 0;
@@ -39,6 +40,44 @@ class _WatchState extends State<Watch> {
     }
   }
 
+  void _updateLevel2ReviewInfo(
+      int prId, String level2aStatus, String level2bStatus,
+      [bool isAdminReview = false]) {
+    setState(() {
+      _level2Reviews[prId] = ReviewInfo(
+        level2aStatus: level2aStatus,
+        level2bStatus: level2bStatus,
+        isAdminReview: isAdminReview,
+      );
+    });
+  }
+
+  void _updateLevel2aReviewInfo(int prId, String level2aStatus) {
+    setState(() {
+      _level2Reviews[prId] ??= ReviewInfo(
+          level2aStatus: 'PENDING',
+          level2bStatus: 'PENDING',
+          isAdminReview: false);
+
+      _level2Reviews[prId]?.level2aStatus = level2aStatus;
+      _level2Reviews[prId]?.level2bStatus ??= 'PENDING';
+      _level2Reviews[prId]?.isAdminReview ??= false;
+    });
+  }
+
+  void _updateLevel2bReviewInfo(int prId, String level2bStatus) {
+    setState(() {
+      _level2Reviews[prId] ??= ReviewInfo(
+          level2aStatus: 'PENDING',
+          level2bStatus: 'PENDING',
+          isAdminReview: false);
+
+      _level2Reviews[prId]?.level2aStatus ??= 'PENDING';
+      _level2Reviews[prId]?.level2bStatus = level2bStatus;
+      _level2Reviews[prId]?.isAdminReview ??= false;
+    });
+  }
+
   Future<void> _loadReview(String org, String repo) async {
     try {
       _loadingCount++;
@@ -50,9 +89,8 @@ class _WatchState extends State<Watch> {
       }
       _loadingCount--;
       _finalizeList();
-    }
-    on Exception catch (e) {
-      if(!mounted) return;
+    } on Exception catch (e) {
+      if (!mounted) return;
       SnackbarService.show(context, e.toString());
     }
   }
@@ -84,6 +122,14 @@ class _WatchState extends State<Watch> {
       final level2 = reviews
           .where((pr) => widget.appState.memberLevel[pr.user!.id] == 2)
           .toList();
+      var adminReviews = [];
+      if (widget.appState.settings.useTwoStepLevel2Reviews) {
+        adminReviews = reviews
+            .where((pr) =>
+                widget.appState.isAdminReviewer[pr.user!.id] == true &&
+                widget.appState.memberLevel[pr.user!.id] == 2)
+            .toList();
+      }
 
       for (var i = 0; i < level1.length; i++) {
         if (level1.any((element) =>
@@ -105,21 +151,79 @@ class _WatchState extends State<Watch> {
         }
       }
 
-      if (level1.any((element) => element.state == 'CHANGES_REQUESTED')) {
-        _level1[pr.id] = 'CHANGES_REQUESTED';
-      } else if (level1.any((element) => element.state == 'APPROVED')) {
-        _level1[pr.id] = 'APPROVED';
-      } else {
-        _level1[pr.id] = 'PENDING';
+      for (var i = 0; i < adminReviews.length; i++) {
+        if (adminReviews.any((element) =>
+            element.id != adminReviews[i].id &&
+            element.submittedAt.isAfter(adminReviews[i].submittedAt) &&
+            element.user?.id == adminReviews[i].user?.id)) {
+          adminReviews.removeAt(i);
+          i--;
+        }
       }
 
-      if (level2.any((element) => element.state == 'CHANGES_REQUESTED')) {
-        _level2[pr.id] = 'CHANGES_REQUESTED';
-      } else if (level2.any((element) => element.state == 'APPROVED')) {
-        _level2[pr.id] = 'APPROVED';
-      } else {
-        _level2[pr.id] = 'PENDING';
-      }
+      setState(() {
+        if (level1.any((element) => element.state == 'CHANGES_REQUESTED')) {
+          _level1[pr.id] = 'CHANGES_REQUESTED';
+        } else if (level1.any((element) => element.state == 'APPROVED')) {
+          _level1[pr.id] = 'APPROVED';
+        } else {
+          _level1[pr.id] = 'PENDING';
+        }
+
+        if (widget.appState.settings.useTwoStepLevel2Reviews) {
+          if (adminReviews.isNotEmpty &&
+              !level2.any((element) =>
+                  element.state == 'CHANGES_REQUESTED' &&
+                  widget.appState.isAdminReviewer[element.user!.id] != true)) {
+            if (adminReviews
+                .any((element) => element.state == 'CHANGES_REQUESTED')) {
+              _updateLevel2ReviewInfo(
+                  pr.id, 'CHANGES_REQUESTED', 'CHANGES_REQUESTED', true);
+            } else if (adminReviews
+                .any((element) => element.state == 'APPROVED')) {
+              _updateLevel2ReviewInfo(pr.id, 'APPROVED', 'APPROVED', true);
+            } else {
+              _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING', true);
+            }
+          } else {
+            int changesRequestedCount = level2
+                .where((element) => element.state == 'CHANGES_REQUESTED')
+                .length;
+            int approvedCount =
+                level2.where((element) => element.state == 'APPROVED').length;
+
+            if (changesRequestedCount >= 2) {
+              _updateLevel2ReviewInfo(
+                  pr.id, 'CHANGES_REQUESTED', 'CHANGES_REQUESTED');
+            } else if (changesRequestedCount == 1) {
+              if (approvedCount >= 1) {
+                _updateLevel2ReviewInfo(pr.id, 'CHANGES_REQUESTED', 'APPROVED');
+              } else {
+                _updateLevel2ReviewInfo(pr.id, 'CHANGES_REQUESTED', 'PENDING');
+              }
+            } else if (approvedCount >= 2) {
+              _updateLevel2ReviewInfo(pr.id, 'APPROVED', 'APPROVED');
+            } else if (approvedCount == 1) {
+              _updateLevel2ReviewInfo(pr.id, 'APPROVED', 'PENDING');
+            } else {
+              _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING');
+            }
+          }
+        } else {
+          if (level2.isNotEmpty) {
+            if (level2.any((element) => element.state == 'CHANGES_REQUESTED')) {
+              _updateLevel2ReviewInfo(
+                  pr.id, 'CHANGES_REQUESTED', 'CHANGES_REQUESTED');
+            } else if (level2.any((element) => element.state == 'APPROVED')) {
+              _updateLevel2ReviewInfo(pr.id, 'APPROVED', 'APPROVED');
+            } else {
+              _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING');
+            }
+          } else {
+            _updateLevel2ReviewInfo(pr.id, 'PENDING', 'PENDING');
+          }
+        }
+      });
 
       if (pr.user!.id == widget.appState.currentUser!.id) {
         if (widget.appState.settings.showYourDrafts) {
@@ -149,12 +253,11 @@ class _WatchState extends State<Watch> {
 
       _loadingCount--;
       _finalizeList();
-    }
-    on Exception catch (e) {
-        if(!mounted) return;
-        SnackbarService.show(context, e.toString());
-        _loadingCount--;
-        _finalizeList();
+    } on Exception catch (e) {
+      if (!mounted) return;
+      SnackbarService.show(context, e.toString());
+      _loadingCount--;
+      _finalizeList();
     }
   }
 
@@ -262,9 +365,19 @@ class _WatchState extends State<Watch> {
                   style: TextStyle(color: Colors.white, fontSize: 24),
                 ),
                 const SizedBox(width: 5),
-                Icon(
-                  Icons.circle,
-                  color: _getColor(_level2[_filteredPullRequests[index].id]!),
+                Row(
+                  children: [
+                    SplitCircle(
+                      colorLeft: _getColor(
+                          _level2Reviews[_filteredPullRequests[index].id]!
+                              .level2aStatus),
+                      colorRight: _getColor(
+                          _level2Reviews[_filteredPullRequests[index].id]!
+                              .level2bStatus),
+                      showStar: _level2Reviews[_filteredPullRequests[index].id]!
+                          .isAdminReview,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -315,9 +428,21 @@ class _WatchState extends State<Watch> {
                   style: TextStyle(color: Colors.white, fontSize: 24),
                 ),
                 const SizedBox(width: 5),
-                Icon(
-                  Icons.circle,
-                  color: _getColor(_level2[_filteredMyPullRequests[index].id]!),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SplitCircle(
+                      colorLeft: _getColor(
+                          _level2Reviews[_filteredMyPullRequests[index].id]!
+                              .level2aStatus),
+                      colorRight: _getColor(
+                          _level2Reviews[_filteredMyPullRequests[index].id]!
+                              .level2bStatus),
+                      showStar:
+                          _level2Reviews[_filteredMyPullRequests[index].id]!
+                              .isAdminReview,
+                    ),
+                  ],
                 ),
               ],
             ),
