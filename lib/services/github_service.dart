@@ -118,7 +118,7 @@ class GithubService {
   }
 
   // Logs the full GitHub error response (status, rate-limit/SSO headers, body)
-  // and returns an exception that includes GitHub's reason.
+  // and returns an exception with the message and status code.
   Exception _requestFailed(String message, http.Response response) {
     final headers = response.headers;
     final reset = int.tryParse(headers['x-ratelimit-reset'] ?? '');
@@ -142,14 +142,7 @@ class GithubService {
         '  x-accepted-github-permissions: ${headers['x-accepted-github-permissions']}\n'
         '  body: $body');
 
-    String? reason;
-    try {
-      reason = jsonDecode(response.body)['message'] as String?;
-    } catch (_) {
-      reason = null;
-    }
-    return Exception('$message. Status code: ${response.statusCode}'
-        '${reason == null ? '' : '. GitHub says: $reason'}');
+    return Exception('$message Status code: ${response.statusCode}');
   }
 
   Future<User> fetchCurrentUser() async {
@@ -158,7 +151,7 @@ class GithubService {
     if (response.statusCode == 200) {
       return User.fromJson(jsonDecode(response.body));
     } else {
-      throw _requestFailed('Failed to load user', response);
+      throw _requestFailed('Failed to load user.', response);
     }
   }
 
@@ -177,7 +170,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed('Failed to load organizations', response);
+        throw _requestFailed('Failed to load organizations.', response);
       }
     }
     return orgs;
@@ -220,7 +213,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed('Failed to load pull requests', response);
+        throw _requestFailed('Failed to load pull requests.', response);
       }
     }
     return pulls;
@@ -242,7 +235,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed('Failed to load repositories', response);
+        throw _requestFailed('Failed to load repositories.', response);
       }
     }
     return repos;
@@ -263,7 +256,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed('Failed to load members', response);
+        throw _requestFailed('Failed to load members.', response);
       }
     }
     return repos;
@@ -277,7 +270,7 @@ class GithubService {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((e) => Review.fromJson(e)).toList();
     } else {
-      throw _requestFailed('Failed to load review state', response);
+      throw _requestFailed('Failed to load review state.', response);
     }
   }
 }
