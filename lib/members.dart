@@ -102,7 +102,7 @@ class _MembersState extends State<Members> {
     return ListView.builder(
         itemCount: widget.appState.members.length,
         itemBuilder: (context, index) {
-          return Container(
+          return Material(
             color: index.isEven ? Colors.black26 : Colors.black12,
             child: ListTile(
               contentPadding: const EdgeInsets.all(8),
