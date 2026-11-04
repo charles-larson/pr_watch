@@ -92,6 +92,8 @@ class _WatchState extends State<Watch> {
     } on Exception catch (e) {
       if (!mounted) return;
       SnackbarService.show(context, e.toString());
+      _loadingCount--;
+      _finalizeList();
     }
   }
 
