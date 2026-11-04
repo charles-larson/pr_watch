@@ -63,7 +63,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surfaceDim,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       drawer: _appState.configured
           ? Drawer(
               child: ListView(padding: EdgeInsets.zero, children: [
