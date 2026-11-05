@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pr_watch/app_theme.dart';
 import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/models/repository.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,17 +34,18 @@ class _ReposState extends State<Repos> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return SingleChildScrollView(
       child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Search',
-                labelStyle: TextStyle(color: Colors.white),
-                prefixIcon: Icon(Icons.search, color: Colors.white),
-                border: OutlineInputBorder(),
+                labelStyle: TextStyle(color: colors.text),
+                prefixIcon: Icon(Icons.search, color: colors.text),
+                border: const OutlineInputBorder(),
               ),
               onChanged: _search,
             ),
@@ -55,11 +57,11 @@ class _ReposState extends State<Repos> {
               return ListTile(
                 title: Text(
                   _filteredRepos[index].name,
-                  style: const TextStyle(fontSize: 20, color: Colors.white),
+                  style: TextStyle(fontSize: 20, color: colors.text),
                 ),
                 subtitle: Text(_filteredRepos[index].description ?? '',
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white60)),
+                    style: TextStyle(color: colors.secondaryText)),
                 leading: CircleAvatar(
                   backgroundImage:
                       NetworkImage(_filteredRepos[index].owner.avatarUrl!),
@@ -67,11 +69,11 @@ class _ReposState extends State<Repos> {
                 trailing: TextButton(
                   onPressed: () =>
                       launchUrl(Uri.parse(_filteredRepos[index].htmlUrl)),
-                  child: const Padding(
-                    padding: EdgeInsets.all(8.0),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
                     child: Text(
                       'View',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: colors.text),
                     ),
                   ),
                 ),

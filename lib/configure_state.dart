@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:pr_watch/app_theme.dart';
 import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/models/organization.dart';
 import 'package:pr_watch/models/settings.dart';
@@ -119,6 +120,33 @@ class _ConfigureStateState extends State<ConfigureState> {
             value: _appState.members.map((e) => e.id).join(','));
       }
 
+      // Bots can't be team members, so they're saved by login from the
+      // Members page. Their watched state is kept with the members'.
+      var botLogins = await storage.read(key: 'BOTS');
+      if (botLogins != null && botLogins.isNotEmpty) {
+        var watched = (await storage.read(key: 'WATCHED_MEMBERS'))
+            ?.split(',')
+            .map((e) => int.tryParse(e));
+        for (var login in botLogins.split(',')) {
+          try {
+            var bot = await GithubService.instance.fetchMember(login);
+            _appState.bots.add(bot);
+            _appState.isMemberWatched[bot.id] =
+                watched?.contains(bot.id) ?? true;
+          } on Exception catch (e) {
+            if (mounted) SnackbarService.show(context, e.toString());
+          }
+        }
+      }
+
+      // No saved selection means bot PRs show from every team repository.
+      var botRepos = await storage.read(key: 'BOT_REPOS');
+      var botRepoIds = botRepos?.split(',').map((e) => int.tryParse(e));
+      for (var i = 0; i < _appState.repositories.length; i++) {
+        _appState.isBotRepoWatched[_appState.repositories[i].id] =
+            botRepoIds?.contains(_appState.repositories[i].id) ?? true;
+      }
+
       var adminReviewers = await storage.read(key: 'ADMIN_REVIEWER');
       if (adminReviewers != null) {
         var admin = adminReviewers.split(',').map((e) => int.tryParse(e));
@@ -209,13 +237,14 @@ class _ConfigureStateState extends State<ConfigureState> {
   }
 
   Widget _buildOrgSelect() {
+    final colors = AppColors.of(context);
     return Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16.0),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
           child: Text(
             'Select an organization',
-            style: TextStyle(fontSize: 36, color: Colors.white),
+            style: TextStyle(fontSize: 36, color: colors.text),
           ),
         ),
         const Divider(
@@ -252,37 +281,38 @@ class _ConfigureStateState extends State<ConfigureState> {
             ),
           ),
         if (_orgs.isEmpty)
-          const Center(
+          Center(
             child: Text('You are not part of any organizations',
-                style: TextStyle(fontSize: 24, color: Colors.white)),
+                style: TextStyle(fontSize: 24, color: colors.text)),
           ),
       ],
     );
   }
 
   Widget _buildTeamSelect() {
+    final colors = AppColors.of(context);
     return Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16.0),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
           child: Text(
             'Select a team',
-            style: TextStyle(fontSize: 36, color: Colors.white),
+            style: TextStyle(fontSize: 36, color: colors.text),
           ),
         ),
         TextField(
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Search',
-            labelStyle: TextStyle(color: Colors.white),
-            prefixIcon: Icon(Icons.search, color: Colors.white),
+            labelStyle: TextStyle(color: colors.text),
+            prefixIcon: Icon(Icons.search, color: colors.text),
             enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.white),
+              borderSide: BorderSide(color: colors.text),
             ),
             focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.white),
+              borderSide: BorderSide(color: colors.text),
             ),
           ),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: colors.text),
           onChanged: (value) {
             setState(() {
               _emptySearchText = value.isEmpty;
@@ -335,14 +365,14 @@ class _ConfigureStateState extends State<ConfigureState> {
             ),
           ),
         if (_filteredTeams.isEmpty && !_emptySearchText)
-          const Center(
+          Center(
             child: Text('No teams found',
-                style: TextStyle(fontSize: 24, color: Colors.white)),
+                style: TextStyle(fontSize: 24, color: colors.text)),
           ),
         if (_filteredTeams.isEmpty && _emptySearchText)
-          const Center(
+          Center(
             child: Text('Search for your team',
-                style: TextStyle(fontSize: 24, color: Colors.white)),
+                style: TextStyle(fontSize: 24, color: colors.text)),
           ),
       ],
     );
@@ -359,7 +389,8 @@ class _ConfigureStateState extends State<ConfigureState> {
               const SizedBox(height: 10),
               Text(
                 _loadingText,
-                style: const TextStyle(color: Colors.white, fontSize: 24),
+                style: TextStyle(
+                    color: AppColors.of(context).text, fontSize: 24),
               ),
             ],
           ))

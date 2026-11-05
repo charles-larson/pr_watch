@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:pr_watch/app_theme.dart';
 import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/services/github_service.dart';
 import 'package:pr_watch/services/snackbar_service.dart';
@@ -40,13 +41,14 @@ class _LoadStateState extends State<LoadState> {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 20),
-          Text('Loading...'),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 20),
+          Text('Loading...',
+              style: TextStyle(color: AppColors.of(context).text)),
         ],
       ),
     );

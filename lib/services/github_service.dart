@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:pr_watch/models/member.dart';
 import 'package:pr_watch/models/organization.dart';
 import 'package:pr_watch/models/pull_request.dart';
@@ -20,6 +19,8 @@ class GithubService {
   // GitHub's secondary rate limit allows at most 100 concurrent requests.
   static const _maxConcurrentRequests = 80;
   static const _maxRetries = 3;
+  // Without this, a request can wait forever if the network drops mid-request.
+  static const _requestTimeout = Duration(seconds: 30);
   int _activeRequests = 0;
   final _waitingRequests = Queue<Completer<void>>();
   DateTime? _pausedUntil;
@@ -38,12 +39,7 @@ class GithubService {
       http.Response response;
       try {
         await _waitForPause();
-        response = await http.get(
-          uri,
-          headers: {
-            'Authorization': 'Bearer $_token',
-          },
-        );
+        response = await _send(uri);
       } finally {
         _releaseSlot();
       }
@@ -52,12 +48,30 @@ class GithubService {
       if (wait == null || attempt >= _maxRetries) {
         return response;
       }
-      debugPrint('[GithubService] Rate limited on $uri. Retrying in '
-          '${wait.inSeconds}s (retry ${attempt + 1} of $_maxRetries)');
       final resumeAt = DateTime.now().add(wait);
       if (_pausedUntil == null || resumeAt.isAfter(_pausedUntil!)) {
         _pausedUntil = resumeAt;
       }
+    }
+  }
+
+  // Throws a ClientException if GitHub doesn't respond within _requestTimeout.
+  Future<http.Response> _send(Uri uri) async {
+    final abort = Completer<void>();
+    final timer = Timer(_requestTimeout, abort.complete);
+    final client = http.Client();
+    try {
+      final request = http.AbortableRequest('GET', uri,
+          abortTrigger: abort.future)
+        ..headers['Authorization'] = 'Bearer $_token';
+      return await http.Response.fromStream(await client.send(request));
+    } on http.RequestAbortedException {
+      throw http.ClientException(
+          'GitHub did not respond within ${_requestTimeout.inSeconds} seconds.',
+          uri);
+    } finally {
+      timer.cancel();
+      client.close();
     }
   }
 
@@ -117,41 +131,13 @@ class GithubService {
     return null;
   }
 
-  // Logs the full GitHub error response (status, rate-limit/SSO headers, body)
-  // and returns an exception with the message and status code.
-  Exception _requestFailed(String message, http.Response response) {
-    final headers = response.headers;
-    final reset = int.tryParse(headers['x-ratelimit-reset'] ?? '');
-    final resetAt = reset == null
-        ? null
-        : DateTime.fromMillisecondsSinceEpoch(reset * 1000).toLocal();
-    final body = response.body.length > 1000
-        ? '${response.body.substring(0, 1000)}...'
-        : response.body;
-
-    debugPrint('[GithubService] $message\n'
-        '  url: ${response.request?.method} ${response.request?.url}\n'
-        '  status: ${response.statusCode}\n'
-        '  x-ratelimit-limit: ${headers['x-ratelimit-limit']}\n'
-        '  x-ratelimit-remaining: ${headers['x-ratelimit-remaining']}\n'
-        '  x-ratelimit-used: ${headers['x-ratelimit-used']}\n'
-        '  x-ratelimit-reset: ${headers['x-ratelimit-reset']} ($resetAt)\n'
-        '  x-ratelimit-resource: ${headers['x-ratelimit-resource']}\n'
-        '  retry-after: ${headers['retry-after']}\n'
-        '  x-github-sso: ${headers['x-github-sso']}\n'
-        '  x-accepted-github-permissions: ${headers['x-accepted-github-permissions']}\n'
-        '  body: $body');
-
-    return Exception('$message Status code: ${response.statusCode}');
-  }
-
   Future<User> fetchCurrentUser() async {
     final response = await _get(Uri.parse('$_baseUrl/user'));
 
     if (response.statusCode == 200) {
       return User.fromJson(jsonDecode(response.body));
     } else {
-      throw _requestFailed('Failed to load user.', response);
+      throw Exception('Failed to load user. Status code: ${response.statusCode}');
     }
   }
 
@@ -170,7 +156,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed('Failed to load organizations.', response);
+        throw Exception('Failed to load organizations. Status code: ${response.statusCode}');
       }
     }
     return orgs;
@@ -190,8 +176,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed(
-            'Failed to load teams. Did you enable SSO? 👀', response);
+        throw Exception('Failed to load teams. Did you enable SSO? 👀 Status code: ${response.statusCode}');
       }
     }
     teams.sort((a, b) => a.name.compareTo(b.name));
@@ -213,7 +198,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed('Failed to load pull requests.', response);
+        throw Exception('Failed to load pull requests. Status code: ${response.statusCode}');
       }
     }
     return pulls;
@@ -235,7 +220,7 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed('Failed to load repositories.', response);
+        throw Exception('Failed to load repositories. Status code: ${response.statusCode}');
       }
     }
     return repos;
@@ -256,10 +241,21 @@ class GithubService {
         }
         page++;
       } else {
-        throw _requestFailed('Failed to load members.', response);
+        throw Exception('Failed to load members. Status code: ${response.statusCode}');
       }
     }
     return repos;
+  }
+
+  Future<Member> fetchMember(String login) async {
+    final response = await _get(
+        Uri.parse('$_baseUrl/users/${Uri.encodeComponent(login)}'));
+
+    if (response.statusCode == 200) {
+      return Member.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to load $login. Status code: ${response.statusCode}');
+    }
   }
 
   Future<List<Review>> fetchReviewState(PullRequest pr) async {
@@ -270,7 +266,7 @@ class GithubService {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((e) => Review.fromJson(e)).toList();
     } else {
-      throw _requestFailed('Failed to load review state.', response);
+      throw Exception('Failed to load review state. Status code: ${response.statusCode}');
     }
   }
 }

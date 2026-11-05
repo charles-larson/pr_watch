@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:pr_watch/app_theme.dart';
 import 'package:pr_watch/split_circle.dart';
 import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/models/pull_request.dart';
@@ -24,20 +26,67 @@ class _WatchState extends State<Watch> {
   final List<PullRequest> _filteredPullRequests = [];
   final Map<int, String> _level1 = {};
   final Map<int, ReviewInfo> _level2Reviews = {};
+  static const _refreshSeconds = 600;
+  // After a refresh that couldn't reach GitHub, retry sooner, up to
+  // _maxRetries times. Then auto-refresh pauses until a manual refresh.
+  static const _retrySeconds = 30;
+  static const _maxRetries = 3;
   int _loadingCount = 0;
   int _refreshCountdown = 0;
   bool get _loading => _loadingCount > 0;
+  int _retryCount = 0;
+  bool _refreshing = false;
+  bool _networkFailed = false;
+  bool _autoRefreshPaused = false;
 
-  void refresh() {
+  void refresh({bool manual = false}) {
+    if (manual) {
+      _retryCount = 0;
+    }
     setState(() {
-      _refreshCountdown = 600;
+      _refreshCountdown = _retryCount > 0 ? _retrySeconds : _refreshSeconds;
+      _autoRefreshPaused = false;
     });
+    _refreshing = true;
+    _networkFailed = false;
     _pullRequests.clear();
     _myPullRequests.clear();
     for (var i = 0; i < widget.appState.repositories.length; i++) {
       _loadReview(widget.appState.currentOrganization!.login,
           widget.appState.repositories[i].name);
     }
+  }
+
+  // Bot PRs only show from the repositories picked in the Bots section.
+  bool _isPrWatched(PullRequest pr) {
+    if (widget.appState.isMemberWatched[pr.user!.id] != true) {
+      return false;
+    }
+    final isBot = widget.appState.bots.any((bot) => bot.id == pr.user!.id);
+    return !isBot || widget.appState.isBotRepoWatched[pr.base.repo.id] == true;
+  }
+
+  void _onRefreshDone() {
+    if (!_networkFailed) {
+      _retryCount = 0;
+      _refreshCountdown = _refreshSeconds;
+    } else if (_retryCount < _maxRetries) {
+      _retryCount++;
+      _refreshCountdown = _retrySeconds;
+    } else {
+      _autoRefreshPaused = true;
+    }
+  }
+
+  // Network errors (offline, timed out) show once per refresh, not per repo.
+  void _showError(Exception e) {
+    if (e is http.ClientException) {
+      if (_networkFailed) return;
+      _networkFailed = true;
+      SnackbarService.show(context, e.message);
+      return;
+    }
+    SnackbarService.show(context, e.toString());
   }
 
   void _updateLevel2ReviewInfo(
@@ -82,7 +131,7 @@ class _WatchState extends State<Watch> {
     try {
       _loadingCount++;
       var prs = (await GithubService.instance.fetchPullRequests(org, repo))
-          .where((pr) => widget.appState.isMemberWatched[pr.user!.id] == true)
+          .where(_isPrWatched)
           .toList();
       for (var pr in prs) {
         _loadReviewedState(pr);
@@ -91,7 +140,7 @@ class _WatchState extends State<Watch> {
       _finalizeList();
     } on Exception catch (e) {
       if (!mounted) return;
-      SnackbarService.show(context, e.toString());
+      _showError(e);
       _loadingCount--;
       _finalizeList();
     }
@@ -257,7 +306,7 @@ class _WatchState extends State<Watch> {
       _finalizeList();
     } on Exception catch (e) {
       if (!mounted) return;
-      SnackbarService.show(context, e.toString());
+      _showError(e);
       _loadingCount--;
       _finalizeList();
     }
@@ -266,6 +315,10 @@ class _WatchState extends State<Watch> {
   void _finalizeList() {
     if (_loadingCount != 0) {
       return;
+    }
+    if (_refreshing) {
+      _refreshing = false;
+      _onRefreshDone();
     }
     switch (widget.appState.settings.sortMode) {
       case SortMode.alphabetical:
@@ -313,6 +366,9 @@ class _WatchState extends State<Watch> {
         timer.cancel();
         return;
       }
+      if (_autoRefreshPaused) {
+        return;
+      }
       if (_refreshCountdown > 0) {
         if (_loadingCount == 0) {
           setState(() {
@@ -327,6 +383,7 @@ class _WatchState extends State<Watch> {
   }
 
   Widget _buildList() {
+    final colors = AppColors.of(context);
     return ListView.builder(
       itemCount: _filteredPullRequests.length,
       physics: const NeverScrollableScrollPhysics(),
@@ -337,10 +394,10 @@ class _WatchState extends State<Watch> {
           child: ListTile(
             title: Text(
               _filteredPullRequests[index].title,
-              style: const TextStyle(fontSize: 20, color: Colors.white),
+              style: TextStyle(fontSize: 20, color: colors.text),
             ),
             subtitle: Text(_filteredPullRequests[index].base.repo.name,
-                style: const TextStyle(color: Colors.white60)),
+                style: TextStyle(color: colors.secondaryText)),
             leading: CircleAvatar(
               backgroundImage:
                   NetworkImage(_filteredPullRequests[index].user!.avatarUrl!),
@@ -352,9 +409,9 @@ class _WatchState extends State<Watch> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Text(
+                Text(
                   'Level 1',
-                  style: TextStyle(color: Colors.white, fontSize: 24),
+                  style: TextStyle(color: colors.text, fontSize: 24),
                 ),
                 const SizedBox(width: 5),
                 Icon(
@@ -362,9 +419,9 @@ class _WatchState extends State<Watch> {
                   color: _getColor(_level1[_filteredPullRequests[index].id]!),
                 ),
                 const SizedBox(width: 10),
-                const Text(
+                Text(
                   'Level 2',
-                  style: TextStyle(color: Colors.white, fontSize: 24),
+                  style: TextStyle(color: colors.text, fontSize: 24),
                 ),
                 const SizedBox(width: 5),
                 Row(
@@ -390,6 +447,7 @@ class _WatchState extends State<Watch> {
   }
 
   Widget _buildYourList() {
+    final colors = AppColors.of(context);
     return ListView.builder(
       itemCount: _filteredMyPullRequests.length,
       physics: const NeverScrollableScrollPhysics(),
@@ -400,10 +458,10 @@ class _WatchState extends State<Watch> {
           child: ListTile(
             title: Text(
               _filteredMyPullRequests[index].title,
-              style: const TextStyle(fontSize: 20, color: Colors.white),
+              style: TextStyle(fontSize: 20, color: colors.text),
             ),
             subtitle: Text(_filteredMyPullRequests[index].base.repo.name,
-                style: const TextStyle(color: Colors.white60)),
+                style: TextStyle(color: colors.secondaryText)),
             leading: CircleAvatar(
               backgroundImage:
                   NetworkImage(_filteredMyPullRequests[index].user!.avatarUrl!),
@@ -415,9 +473,9 @@ class _WatchState extends State<Watch> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Text(
+                Text(
                   'Level 1',
-                  style: TextStyle(color: Colors.white, fontSize: 24),
+                  style: TextStyle(color: colors.text, fontSize: 24),
                 ),
                 const SizedBox(width: 5),
                 Icon(
@@ -425,9 +483,9 @@ class _WatchState extends State<Watch> {
                   color: _getColor(_level1[_filteredMyPullRequests[index].id]!),
                 ),
                 const SizedBox(width: 10),
-                const Text(
+                Text(
                   'Level 2',
-                  style: TextStyle(color: Colors.white, fontSize: 24),
+                  style: TextStyle(color: colors.text, fontSize: 24),
                 ),
                 const SizedBox(width: 5),
                 Row(
@@ -454,6 +512,30 @@ class _WatchState extends State<Watch> {
     );
   }
 
+  Widget _buildRefreshStatus() {
+    final colors = AppColors.of(context);
+    final style = TextStyle(fontSize: 24, color: colors.text);
+    if (_autoRefreshPaused) {
+      return Tooltip(
+        message: "Couldn't reach GitHub after $_maxRetries retries",
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.sync_problem, color: Colors.orange),
+            const SizedBox(width: 8),
+            Text('Auto-refresh paused. Refresh manually', style: style),
+          ],
+        ),
+      );
+    }
+    if (_retryCount > 0) {
+      return Text(
+          'Retrying in ${_secondsToTime()} ($_retryCount of $_maxRetries)',
+          style: style);
+    }
+    return Text('Refresh in ${_secondsToTime()}', style: style);
+  }
+
   String _secondsToTime() {
     var minutes = (_refreshCountdown / 60).floor();
     var remainingSeconds = _refreshCountdown % 60;
@@ -473,13 +555,14 @@ class _WatchState extends State<Watch> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            color: Colors.white10,
+            color: colors.headerBand,
             child: Padding(
               padding: const EdgeInsets.all(12.0),
               child: Row(
@@ -487,19 +570,17 @@ class _WatchState extends State<Watch> {
                 children: [
                   Expanded(
                     child: TextField(
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Search',
-                        labelStyle: TextStyle(color: Colors.white),
-                        prefixIcon: Icon(Icons.search, color: Colors.white),
-                        border: OutlineInputBorder(),
+                        labelStyle: TextStyle(color: colors.text),
+                        prefixIcon: Icon(Icons.search, color: colors.text),
+                        border: const OutlineInputBorder(),
                       ),
                       onChanged: _filter,
                     ),
                   ),
                   const Spacer(),
-                  Text('Refresh in ${_secondsToTime()}',
-                      style:
-                          const TextStyle(fontSize: 24, color: Colors.white)),
+                  _buildRefreshStatus(),
                   const SizedBox(width: 20),
                   _loading
                       ? const SizedBox(
@@ -508,8 +589,9 @@ class _WatchState extends State<Watch> {
                           child: CircularProgressIndicator(),
                         )
                       : IconButton(
-                          icon: const Icon(Icons.refresh, color: Colors.white),
-                          onPressed: refresh,
+                          icon: Icon(Icons.refresh, color: colors.text),
+                          tooltip: 'Refresh',
+                          onPressed: () => refresh(manual: true),
                         ),
                 ],
               ),
@@ -517,18 +599,18 @@ class _WatchState extends State<Watch> {
           ),
           if (_filteredMyPullRequests.isNotEmpty) ...[
             const SizedBox(height: 20),
-            const Text('Your pull requests',
-                style: TextStyle(fontSize: 24, color: Colors.white)),
+            Text('Your pull requests',
+                style: TextStyle(fontSize: 24, color: colors.text)),
             const SizedBox(height: 20),
             _buildYourList(),
           ],
           const SizedBox(height: 20),
-          const Text('Pull requests',
-              style: TextStyle(fontSize: 24, color: Colors.white)),
+          Text('Pull requests',
+              style: TextStyle(fontSize: 24, color: colors.text)),
           const SizedBox(height: 20),
           if (_filteredPullRequests.isEmpty && !_loading) ...[
-            const Text('No pull requests',
-                style: TextStyle(fontSize: 20, color: Colors.white)),
+            Text('No pull requests',
+                style: TextStyle(fontSize: 20, color: colors.text)),
           ] else ...[
             _buildList(),
           ],

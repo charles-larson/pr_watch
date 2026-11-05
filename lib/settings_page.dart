@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:pr_watch/app_theme.dart';
 import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/models/settings.dart';
 
@@ -68,18 +69,18 @@ class _MembersState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return Column(
       children: [
-        const Text('Settings',
-            style: TextStyle(fontSize: 24, color: Colors.white)),
+        Text('Settings', style: TextStyle(fontSize: 24, color: colors.text)),
         const SizedBox(height: 20),
         Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Sort by:',
-                  style: TextStyle(color: Colors.white, fontSize: 18)),
+              Text('Sort by:',
+                  style: TextStyle(color: colors.text, fontSize: 18)),
               DropdownButton<SortMode>(
                   value: widget.appState.settings.sortMode,
                   items: SortMode.values
@@ -87,7 +88,7 @@ class _MembersState extends State<SettingsPage> {
                           value: mode,
                           child: Text(
                             _sortModeToString(mode),
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: colors.text),
                           )))
                       .toList(),
                   onChanged: _sortChanged),
@@ -99,8 +100,8 @@ class _MembersState extends State<SettingsPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Show your draft PRs:',
-                  style: TextStyle(color: Colors.white, fontSize: 18)),
+              Text('Show your draft PRs:',
+                  style: TextStyle(color: colors.text, fontSize: 18)),
               Switch(
                   value: widget.appState.settings.showYourDrafts,
                   onChanged: _showYourDraftsChanged),
@@ -112,8 +113,8 @@ class _MembersState extends State<SettingsPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Show reviewed PRs:',
-                  style: TextStyle(color: Colors.white, fontSize: 18)),
+              Text('Show reviewed PRs:',
+                  style: TextStyle(color: colors.text, fontSize: 18)),
               Switch(
                   value: widget.appState.settings.showReviewed,
                   onChanged: _showReviewedChanged),
@@ -125,8 +126,8 @@ class _MembersState extends State<SettingsPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Use two-step Level 2 reviews:',
-                  style: TextStyle(color: Colors.white, fontSize: 18)),
+              Text('Use two-step Level 2 reviews:',
+                  style: TextStyle(color: colors.text, fontSize: 18)),
               Switch(
                   value: widget.appState.settings.useTwoStepLevel2Reviews,
                   onChanged: _useTwoStepLevel2Reviews),
