@@ -11,9 +11,11 @@ class AppState {
   Team? currentTeam;
   List<Repository> repositories = [];
   List<Member> members = []; // create wrapper model for this list and maps
+  List<Member> bots = []; // not team members, so added by login
   Map<int, bool> isMemberWatched = {};
   Map<int, int> memberLevel = {};
   Map<int, bool> isAdminReviewer = {};
+  Map<int, bool> isBotRepoWatched = {};
   Settings settings = Settings.defaultSettings;
 
   AppState({

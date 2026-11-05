@@ -7,6 +7,7 @@ import 'package:pr_watch/members.dart';
 import 'package:pr_watch/models/app_state.dart';
 import 'package:pr_watch/profile.dart';
 import 'package:pr_watch/repos.dart';
+import 'package:pr_watch/services/theme_service.dart';
 import 'package:pr_watch/settings_page.dart';
 import 'package:pr_watch/watch.dart';
 
@@ -48,6 +49,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _logout() async {
     await storage.deleteAll();
+    await ThemeService.instance.save();
     setState(() {
       _appState = AppState();
       _currentWidget = EmptyState(onTokenSet: setToken);
@@ -63,7 +65,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surfaceDim,
       drawer: _appState.configured
           ? Drawer(
               child: ListView(padding: EdgeInsets.zero, children: [
@@ -123,6 +124,39 @@ class _MyHomePageState extends State<MyHomePage> {
               style: const TextStyle(color: Colors.white, fontSize: 24),
             ),
             const Spacer(),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: ThemeService.instance,
+              builder: (context, themeMode, _) {
+                final iconColor = Theme.of(context).colorScheme.primary;
+                return Tooltip(
+                  message: 'Dark mode',
+                  child: MergeSemantics(
+                    child: Semantics(
+                      label: 'Dark mode',
+                      child: Switch(
+                        value: themeMode == ThemeMode.dark,
+                        onChanged: (_) => ThemeService.instance.toggle(),
+                        thumbColor:
+                            const WidgetStatePropertyAll(Colors.white),
+                        trackColor:
+                            const WidgetStatePropertyAll(Colors.white38),
+                        trackOutlineColor:
+                            const WidgetStatePropertyAll(Colors.transparent),
+                        thumbIcon: WidgetStateProperty.resolveWith(
+                          (states) => Icon(
+                            states.contains(WidgetState.selected)
+                                ? Icons.dark_mode
+                                : Icons.light_mode,
+                            color: iconColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 10),
             if (_appState.currentUser != null) ...[
               Text(
                 _appState.currentUser!.name ?? _appState.currentUser!.login,

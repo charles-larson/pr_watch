@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pr_watch/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EmptyState extends StatefulWidget {
@@ -18,15 +19,16 @@ class _EmptyStateState extends State<EmptyState> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return Center(
       child: IntrinsicWidth(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('Please enter a github token from',
+            Text('Please enter a github token from',
                 style: TextStyle(
                   fontSize: 20,
-                  color: Colors.white,
+                  color: colors.text,
                 )),
             InkWell(
               onTap: () =>
@@ -44,18 +46,18 @@ class _EmptyStateState extends State<EmptyState> {
                 Flexible(
                   child: TextField(
                     controller: controller,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'GITHUB_TOKEN',
-                      labelStyle: TextStyle(color: Colors.white),
-                      border: OutlineInputBorder(),
-                      constraints: BoxConstraints(minWidth: 200),
+                      labelStyle: TextStyle(color: colors.text),
+                      border: const OutlineInputBorder(),
+                      constraints: const BoxConstraints(minWidth: 200),
                     ),
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: colors.text),
                     onSubmitted: setToken,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.save, color: Colors.white),
+                  icon: Icon(Icons.save, color: colors.text),
                   onPressed: () => setToken(controller.text),
                 ),
               ],

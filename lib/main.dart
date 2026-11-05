@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:pr_watch/app_theme.dart';
 import 'package:pr_watch/my_home_page.dart';
+import 'package:pr_watch/services/theme_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ThemeService.instance.load();
   runApp(const MyApp());
 }
 
@@ -11,16 +15,15 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue.shade900,
-          surface: const Color(0xFF505050),
-        ),
-        useMaterial3: true,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeService.instance,
+      builder: (context, themeMode, _) => MaterialApp(
+        title: 'Flutter Demo',
+        theme: lightTheme,
+        darkTheme: darkTheme,
+        themeMode: themeMode,
+        home: const MyHomePage(title: 'PR Watch'),
       ),
-      home: const MyHomePage(title: 'PR Watch'),
     );
   }
 }
